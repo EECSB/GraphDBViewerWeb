@@ -1,0 +1,49 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* A read-only Monaco editor for viewing text (the JSON results view). Backed by monacoInterop's
+   separate viewer instance, so it coexists with the main query editor. *@
+<div id="@ElementId" style="@Style"></div>
+
+@code {
+    [Parameter] public string Value { get; set; }
+    [Parameter] public string Style { get; set; } = "position: absolute; inset: 0;";
+
+    private readonly string ElementId = "monaco-view-" + Guid.NewGuid().ToString("N");
+    private bool created;
+    private string lastSynced;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        //A viewer init/update failure must not throw out of the lifecycle — that would tear down the
+        //whole Blazor app. Swallow it (the JS side also guards) so the worst case is an empty viewer.
+        try
+        {
+            if (firstRender)
+            {
+                await JS.InvokeVoidAsync("monacoInterop.createViewer", ElementId, Value ?? string.Empty);
+                created = true;
+                lastSynced = Value;
+            }
+            else if (created && Value != lastSynced)
+            {
+                //The parent pushed new results — mirror them into the read-only editor.
+                lastSynced = Value;
+                await JS.InvokeVoidAsync("monacoInterop.setViewerValue", Value ?? string.Empty);
+            }
+        }
+        catch
+        {
+            //Ignore — the viewer is non-critical.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("monacoInterop.disposeViewer");
+        }
+        catch { }
+    }
+}

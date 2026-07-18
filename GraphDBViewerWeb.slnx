@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="GraphDBViewerWeb.Tests/GraphDBViewerWeb.Tests.csproj" />
+  <Project Path="GraphDBViewerWeb/GraphDBViewerWeb.csproj" />
+</Solution>

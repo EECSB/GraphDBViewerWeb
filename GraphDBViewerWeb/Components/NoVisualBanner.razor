@@ -1,0 +1,11 @@
+@* Shown at the top of the 2D / 3D canvas or the Table when the results parsed but contain nothing
+   renderable as a graph (e.g. a scalar or string list such as g.V().label().dedup()). Offers a jump
+   to the JSON view, where the raw result is visible. *@
+<div class="alert alert-warning d-flex align-items-center justify-content-between gap-2 py-1 px-2 mb-0 small shadow-sm" role="alert">
+    <span>No results could be visualized as a graph.</span>
+    <button class="btn btn-sm text-nowrap" style="color: var(--bs-alert-color); border-color: var(--bs-alert-border-color);" @onclick="OnGoToJson" title="Switch to the JSON view to see the raw result">Go to JSON</button>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnGoToJson { get; set; }
+}

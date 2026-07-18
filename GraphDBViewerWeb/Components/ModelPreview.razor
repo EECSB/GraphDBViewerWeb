@@ -1,0 +1,42 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@* A small three.js viewer for the selected node's linked .obj / .zip model, mirroring the image
+   preview. The heavy lifting lives in modelPreviewInterop.js (one WebGL scene per element id); this
+   component just owns the container and drives render / dispose from the Url parameter. *@
+<div>
+    <div id="@elementId" style="width: 100%; height: 170px; border-radius: 4px; overflow: hidden; background: rgba(127, 127, 127, 0.08);"></div>
+    <div class="form-text mt-0" style="font-size: 0.7em;">Drag to rotate · scroll to zoom</div>
+</div>
+
+@code {
+    [Parameter] public string Url { get; set; }
+    [Parameter] public string Color { get; set; }
+
+    private readonly string elementId = "modelPreview-" + Guid.NewGuid().ToString("N");
+    private string renderedUrl;
+    private string renderedColor;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Url == renderedUrl && Color == renderedColor)
+            return;
+
+        renderedUrl = Url;
+        renderedColor = Color;
+
+        if (!string.IsNullOrWhiteSpace(Url))
+            await JS.InvokeVoidAsync("modelPreviewInterop.render", elementId, Url, Color);
+        else
+            await JS.InvokeVoidAsync("modelPreviewInterop.dispose", elementId);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("modelPreviewInterop.dispose", elementId);
+        }
+        catch { }
+    }
+}

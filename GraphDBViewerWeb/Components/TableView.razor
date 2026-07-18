@@ -1,0 +1,284 @@
+@using System.Text.Json
+@using GraphDBViewerWeb.Code
+
+<div class="border rounded flex-grow-1 p-2" style="overflow:auto;">
+    @{
+        var hasTableData = GraphData.ValueKind != JsonValueKind.Undefined || FallbackData.ValueKind != JsonValueKind.Undefined;
+
+        var tableData = new GraphDataConverter.GraphTable();
+
+        if (hasTableData)
+        {
+            if (GraphData.ValueKind != JsonValueKind.Undefined)
+                tableData = GraphDataConverter.ToTable(GraphData);
+            else
+                tableData = GraphDataConverter.ToTable(FallbackData);
+        }
+    }
+
+    @if (!hasTableData)
+    {
+        <div class="text-muted">No results to tabulate yet. Run a query first.</div>
+    }
+    else if (tableData.Nodes.Count == 0 && tableData.Edges.Count == 0)
+    {
+        <div class="text-muted">No vertices or edges in the result. Scalar/value results are shown in the JSON view.</div>
+    }
+    else
+    {
+        //The viewer's own gdbv* properties (color, size, position, icon, 3D model) are hidden by default —
+        //they're bookkeeping, not data, and their long URLs squeeze the real columns. "Additional
+        //properties" appends them after the real ones.
+        var nodeCols = DataColumns(tableData.NodePropertyColumns);
+        var nodeExtraCols = ViewerColumns(tableData.NodePropertyColumns);
+        var edgeCols = DataColumns(tableData.EdgePropertyColumns);
+        var edgeExtraCols = ViewerColumns(tableData.EdgePropertyColumns);
+        var nodeModelIds = ModelPreviewRowIds(tableData.Nodes, nodePreviewCols);
+        var edgeModelIds = ModelPreviewRowIds(tableData.Edges, edgePreviewCols);
+
+        @if (tableData.Nodes.Count > 0)
+        {
+            <div class="d-flex align-items-center mb-1">
+                <span class="fw-bold">Vertices <span class="text-muted fw-normal">(@tableData.Nodes.Count)</span></span>
+                @if (nodeExtraCols.Count > 0)
+                {
+                    <button class="btn btn-sm btn-link p-0 ms-3 text-decoration-none" @onclick="() => showNodeExtra = !showNodeExtra" title="@ExtraTitle(showNodeExtra)">
+                        <span class="fw-bold me-1">@(showNodeExtra ? "−" : "+")</span>Additional properties (@nodeExtraCols.Count)
+                    </button>
+                }
+            </div>
+            <table class="table table-sm table-hover table-bordered align-middle gdbv-data-table" style="font-size: 0.8em;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Id</th>
+                        <th>Label</th>
+                        @foreach (var col in nodeCols)
+                        {
+                            <th>@col</th>
+                        }
+                        @if (showNodeExtra)
+                        {
+                            @foreach (var col in nodeExtraCols)
+                            {
+                                @ExtraHeaderCell(col, nodePreviewCols)
+                            }
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in tableData.Nodes)
+                    {
+                        var r = row;
+                        <tr style="@NodeRowStyle(r.Label)" @onclick="() => OnNodeSelected.InvokeAsync(r)">
+                            <td>@r.Id</td>
+                            <td><span class="badge bg-secondary">@r.Label</span></td>
+                            @foreach (var col in nodeCols)
+                            {
+                                <td>@(r.Properties.TryGetValue(col, out var val) ? val : "")</td>
+                            }
+                            @if (showNodeExtra)
+                            {
+                                @foreach (var col in nodeExtraCols)
+                                {
+                                    @ExtraBodyCell(col, r, nodePreviewCols, nodeModelIds)
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        @if (tableData.Edges.Count > 0)
+        {
+            <div class="d-flex align-items-center mb-1 mt-3">
+                <span class="fw-bold">Edges <span class="text-muted fw-normal">(@tableData.Edges.Count)</span></span>
+                @if (edgeExtraCols.Count > 0)
+                {
+                    <button class="btn btn-sm btn-link p-0 ms-3 text-decoration-none" @onclick="() => showEdgeExtra = !showEdgeExtra" title="@ExtraTitle(showEdgeExtra)">
+                        <span class="fw-bold me-1">@(showEdgeExtra ? "−" : "+")</span>Additional properties (@edgeExtraCols.Count)
+                    </button>
+                }
+            </div>
+            <table class="table table-sm table-hover table-bordered align-middle gdbv-data-table" style="font-size: 0.8em;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Id</th>
+                        <th>Label</th>
+                        <th>Source</th>
+                        <th>Target</th>
+                        @foreach (var col in edgeCols)
+                        {
+                            <th>@col</th>
+                        }
+                        @if (showEdgeExtra)
+                        {
+                            @foreach (var col in edgeExtraCols)
+                            {
+                                @ExtraHeaderCell(col, edgePreviewCols)
+                            }
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in tableData.Edges)
+                    {
+                        var r = row;
+                        <tr style="cursor:pointer;" @onclick="() => OnEdgeSelected.InvokeAsync(r)">
+                            <td>@r.Id</td>
+                            <td><span class="badge bg-secondary">@r.Label</span></td>
+                            <td>@r.Source</td>
+                            <td>@r.Target</td>
+                            @foreach (var col in edgeCols)
+                            {
+                                <td>@(r.Properties.TryGetValue(col, out var val) ? val : "")</td>
+                            }
+                            @if (showEdgeExtra)
+                            {
+                                @foreach (var col in edgeExtraCols)
+                                {
+                                    @ExtraBodyCell(col, r, edgePreviewCols, edgeModelIds)
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public JsonElement GraphData { get; set; }
+    [Parameter] public JsonElement FallbackData { get; set; }
+    [Parameter] public Dictionary<string, LabelStyle> LabelStyles { get; set; }
+    [Parameter] public EventCallback<GraphDataConverter.GraphRow> OnNodeSelected { get; set; }
+    [Parameter] public EventCallback<GraphDataConverter.GraphRow> OnEdgeSelected { get; set; }
+
+    //"Additional properties" (the gdbv* columns) expanded, kept per table so each expands on its own.
+    private bool showNodeExtra;
+    private bool showEdgeExtra;
+
+    //The columns whose "preview" box is ticked, per table.
+    private readonly HashSet<string> nodePreviewCols = new();
+    private readonly HashSet<string> edgePreviewCols = new();
+
+    //Every 3D preview builds its own WebGL context and render loop, and a browser keeps only a limited
+    //number of contexts alive (silently dropping the oldest), so a model column previews just its first
+    //rows — the rest keep their URL alone. Images are plain <img> and need no such cap.
+    private const int MaxModelPreviews = 8;
+
+    //A gdbv* column header: its name, plus a "preview" box on the two columns that link to something
+    //renderable (the image and the 3D model).
+    private RenderFragment ExtraHeaderCell(string col, HashSet<string> previewCols) =>@<th class="gdbv-extra-col">
+        <div class="d-flex align-items-center gap-3 text-nowrap">
+            <span>@col</span>
+            @if (IsPreviewable(col))
+            {
+                <label class="fw-normal d-inline-flex align-items-center gap-1 mb-0" style="cursor: pointer;" title="@PreviewTitle(col)">
+                    <input type="checkbox" class="form-check-input m-0" style="cursor: pointer;" checked="@previewCols.Contains(col)" @onchange="e => SetPreview(previewCols, col, (bool)(e.Value ?? false))" />
+                    <span style="font-size: 0.9em;">preview</span>
+                </label>
+            }
+        </div>
+    </th>;
+
+    //A gdbv* cell: the raw value, with the linked image / 3D model rendered under it once the column's
+    //"preview" box is ticked.
+    private RenderFragment ExtraBodyCell(string col, GraphDataConverter.GraphRow r, HashSet<string> previewCols, HashSet<string> modelPreviewIds) =>@<td class="gdbv-extra-col">
+        @{
+            var val = r.Properties.GetValueOrDefault(col) ?? "";
+        }
+        <div>@val</div>
+        @if (previewCols.Contains(col) && !string.IsNullOrWhiteSpace(val))
+        {
+            if (col == GdbvKeys.Image)
+            {
+                <img src="@val" alt="Linked image preview" class="gdbv-cell-preview mt-1" loading="lazy" />
+            }
+            else if (modelPreviewIds.Contains(r.Id))
+            {
+                <div class="gdbv-cell-preview mt-1">
+                    <ModelPreview Url="@val" Color="@r.Properties.GetValueOrDefault(GdbvKeys.Color)" />
+                </div>
+            }
+            else
+            {
+                <div class="form-text mt-1" style="font-size: 0.75em;">3D preview shown for the first @MaxModelPreviews rows only.</div>
+            }
+        }
+    </td>;
+
+    //Only the linked-image and linked-model columns have anything to preview.
+    private static bool IsPreviewable(string col)
+    {
+        return col == GdbvKeys.Image || col == GdbvKeys.Model;
+    }
+
+    private void SetPreview(HashSet<string> previewCols, string col, bool on)
+    {
+        if (on)
+            previewCols.Add(col);
+        else
+            previewCols.Remove(col);
+    }
+
+    private static string PreviewTitle(string col)
+    {
+        if (col == GdbvKeys.Image)
+            return "Show each linked image under its URL";
+
+        return "Show each linked 3D model under its URL (drag to rotate, scroll to zoom)";
+    }
+
+    //The rows a model column may preview: the first MaxModelPreviews rows that actually link a model,
+    //so the page never opens more WebGL contexts than the browser will keep.
+    private static HashSet<string> ModelPreviewRowIds(List<GraphDataConverter.GraphRow> rows, HashSet<string> previewCols)
+    {
+        var ids = new HashSet<string>();
+
+        if (!previewCols.Contains(GdbvKeys.Model))
+            return ids;
+
+        foreach (var r in rows)
+        {
+            if (ids.Count >= MaxModelPreviews)
+                break;
+
+            if (!string.IsNullOrWhiteSpace(r.Properties.GetValueOrDefault(GdbvKeys.Model)))
+                ids.Add(r.Id);
+        }
+
+        return ids;
+    }
+
+    //The real data columns — everything that isn't a viewer-reserved gdbv* key.
+    private static List<string> DataColumns(List<string> columns)
+    {
+        return columns.Where(c => !c.StartsWith(GdbvKeys.Prefix)).ToList();
+    }
+
+    //The viewer-reserved (gdbv*) columns, shown only when "Additional properties" is expanded.
+    private static List<string> ViewerColumns(List<string> columns)
+    {
+        return columns.Where(c => c.StartsWith(GdbvKeys.Prefix)).ToList();
+    }
+
+    private static string ExtraTitle(bool expanded)
+    {
+        if (expanded)
+            return "Hide the viewer's own gdbv* properties";
+
+        return "Show the viewer's own gdbv* properties (color, size, position, icon, 3D model) as extra columns at the end";
+    }
+
+    //Fills a vertex row with its label's configured color (with readable text), or leaves it plain.
+    //Bootstrap paints cells from --bs-table-bg / --bs-table-color, so override those (not background-color/color).
+    private string NodeRowStyle(string label)
+    {
+        if (LabelStyles != null && label != null && LabelStyles.TryGetValue(label, out var style) && !string.IsNullOrWhiteSpace(style.Color))
+            return $"cursor:pointer; --bs-table-bg:{style.Color}; --bs-table-color:{ColorUtil.ContrastText(style.Color)};";
+
+        return "cursor:pointer;";
+    }
+}

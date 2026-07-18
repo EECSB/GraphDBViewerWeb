@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Graph DB Viewer(Web)</title>
+    <base />
+    <script>
+        const base = document.getElementsByTagName('base')[0];
+
+        if (window.location.host.includes('localhost')) { //When developing.
+            base.setAttribute('href', '/');
+        } else {
+            base.setAttribute('href', window.location.pathname);
+        }
+    </script>
+    <link rel="preload" id="webassembly" />
+    <link rel="stylesheet" href="lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link href="GraphDBViewerWeb.styles.css" rel="stylesheet" />
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" href="favicon.svg" />
+    <script type="importmap">
+        { "imports": { "three": "./lib/js/three.module.min.js" } }
+    </script>
+</head>
+
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%" />
+            <circle r="40%" cx="50%" cy="50%" />
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">🗙</span>
+    </div>
+    <script src="lib/js/cytoscape.min.js"></script>
+    <script src="lib/js/cytoscape-svg.js"></script>
+    <script src="lib/js/3d-force-graph.min.js"></script>
+    <!-- three.js as an ES module (the UMD build is deprecated / warns) — exposed as a global so the
+         classic interop scripts can use it without themselves becoming modules. -->
+    <script type="module">import * as THREE from 'three'; window.THREE = THREE;</script>
+    <script src="js/graphGeometry.js"></script>
+    <script src="js/CytoscapeInterop.js"></script>
+    <script src="js/3dForceGraphInterop.js"></script>
+    <script src="js/ModelPreviewInterop.js"></script>
+    <script src="js/XrViewerInterop.js"></script>
+    <script src="js/KeyboardInterop.js"></script>
+    <script src="js/ExportInterop.js"></script>
+    <script src="cloudConfig.js"></script>
+    <script src="js/CloudPickerInterop.js"></script>
+    <script src="js/MonacoInterop.js"></script>
+    <script src="js/SplitterInterop.js"></script>
+    <script src="js/UrlCheckInterop.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script>navigator.serviceWorker.register('service-worker.js', { updateViaCache: 'none' });</script>
+</body>
+
+</html>
